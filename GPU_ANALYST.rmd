@@ -1,0 +1,600 @@
+---
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, include=FALSE}
+library(stringr) #Thư viện dùng để tách thay chuỗi con
+library(knitr) #Thư viện dùng để kẻ khung cho bảng cú pháp kable()
+library(corrplot)
+library(car)
+library(caTools)
+
+library(nortest)
+```
+
+## Import data 
+
+Ta sử dụng đoạn code dưới để đọc vào dữ liệu từ bộ dữ liệu All_GPUs.csv
+và xuất mẫu 5 dòng đầu tiên của bộ dữ liệu.
+
+```{r}
+All_GPUs <- read.csv("~/XSTK/BTL/data/All_GPUs.csv")
+head(All_GPUs,5)
+```
+
+Ta chọn ra các biến dữ liệu sẽ được sử dụng: Manufacturer, Memory_Bandwidth,
+Memory_Bus, Memory_Speed và Memory_Type.
+
+```{r}
+All_GPUs <- All_GPUs[,c("Manufacturer", "Memory_Bandwidth", "Memory_Bus", "Memory_Speed", "Memory_Type")]
+head(All_GPUs,5)
+```
+## Data cleaning 
+
+Đầu tiên ta thực hiện loại bỏ các phần không cần thiết trong dữ liệu:
+
+ - Loại bỏ "GB/sec" ở biến Memory_Bandwidth.
+ 
+ - Loại bỏ " Bit" ở biến Memory_Bus.
+ 
+ - Loại bỏ " Mhz" ở biến Memory_Speed.
+
+```{r}
+All_GPUs$"Memory_Bandwidth" <- gsub("GB/sec", "", All_GPUs$"Memory_Bandwidth")
+All_GPUs$"Memory_Bus" <- gsub(" Bit", "", All_GPUs$"Memory_Bus")
+All_GPUs$"Memory_Speed" <- gsub(" MHz","",All_GPUs$"Memory_Speed")
+suppressWarnings(All_GPUs$"Memory_Bandwidth" <- as.numeric(All_GPUs$"Memory_Bandwidth"))
+suppressWarnings(All_GPUs$"Memory_Bus" <- as.integer(All_GPUs$"Memory_Bus"))
+suppressWarnings(All_GPUs$"Memory_Speed" <- as.integer(All_GPUs$"Memory_Speed"))
+All_GPUs[All_GPUs==""] <- NA
+head(All_GPUs,5)
+```
+ 
+ Tiến hành kiểm tra dữ liệu khuyết trong All_GPUs:
+ 
+```{r}
+apply(is.na(All_GPUs),2,sum)
+```
+
+```{r}
+apply(is.na(All_GPUs),2,mean)
+```
+
+Nhận xét: Từ các thống kê trên ta thu được số lượng và tỉ lệ khuyết của từng biến, ta nhận thấy có nhiều giá trị khuyết tại các biến Memory_Bandwidth, Memory_Bus, Memory_Speed. Vì tỉ lệ giá trị khuyết đối với từng biến là thấp (dưới 5%) nên để làm sạch dữ liệu ta lựa chọn phương pháp xóa các giá trị khuyết trong bộ dữ liệu.
+
+```{r}
+All_GPUs_1 <- na.omit(All_GPUs)
+#So quan sat da xoa
+nrow(All_GPUs)-nrow(All_GPUs_1)
+#Ty le quan sat da xoa
+(nrow(All_GPUs)-nrow(All_GPUs_1))/nrow(All_GPUs)
+```
+
+Nhận xét: Ta thấy số lượng dữ liệu đã xóa là 125, chiếm tỉ lệ khoảng 3.7% so với dữ liệu ban đầu, có thể thấy việc xóa các dữ liệu có giá trị khuyết trong bộ dữ liệu không làm ảnh hưởng nhiều đến kết quả của dữ liệu.
+
+## Data visualization 
+
+Tính các giá trị thống kê mô tả đặc trưng của Memory_Bandwidth, Memory_Bus, Memory_Speed theo từng nhãn hàng (Manufacturer).
+
+```{r}
+#Thong so thong ke bien Memory_Bandwidth 
+length = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,length)
+mean = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,mean)
+sd = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,sd)
+min = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,min)
+max = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,max)
+Q1 = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,quantile,probs = 0.25)
+Q2 = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,quantile,probs = 0.5)
+Q3 = tapply(All_GPUs_1$Memory_Bandwidth, All_GPUs_1$Manufacturer,quantile,probs = 0.75)
+t(data.frame(length,mean,sd,min,max,Q1,Q2,Q3))
+```
+
+```{r}
+#Thong so thong ke bien Memory_Bus 
+length = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,length)
+mean = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,mean)
+sd = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,sd)
+min = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,min)
+max = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,max)
+Q1 = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,quantile,probs = 0.25)
+Q2 = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,quantile,probs = 0.5)
+Q3 = tapply(All_GPUs_1$Memory_Bus, All_GPUs_1$Manufacturer,quantile,probs = 0.75)
+t(data.frame(length,mean,sd,min,max,Q1,Q2,Q3))
+```
+
+```{r}
+#Thong so thong ke bien Memory_Speed 
+length = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,length)
+mean = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,mean)
+sd = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,sd)
+min = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,min)
+max = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,max)
+Q1 = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,quantile,probs = 0.25)
+Q2 = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,quantile,probs = 0.5)
+Q3 = tapply(All_GPUs_1$Memory_Speed, All_GPUs_1$Manufacturer,quantile,probs = 0.75)
+t(data.frame(length,mean,sd,min,max,Q1,Q2,Q3))
+```
+Vẽ đồ thị phân tán thể hiện phân phối 
+
+```{r}
+boxplot(Memory_Bandwidth~Manufacturer, xlab = "Manufacturer", ylab = "Memory Bandwidth (GB/sec)", main = "Boxplot of Memory Bandwidth for each Manufacturer", data = All_GPUs_1, col = 2:7)
+boxplot(Memory_Bus~Manufacturer, xlab = "Manufacturer", ylab = "Memory Bus (Bit)", main = "Boxplot of Memory Bus for each Manufacturer", data = All_GPUs_1, col = 2:7)
+boxplot(Memory_Speed~Manufacturer, xlab = "Manufacturer", ylab = "Memory Speed (Mhz)", main = "Boxplot of Memory Speed for each Manufacturer", data = All_GPUs_1, col = 2:7)
+```
+
+Nhận xét: Qua biểu đồ trên ta thấy rằng có rất nhiều điểm ngoại lai (outliers) ở các biến, điều này có thể là nguyên nhân ảnh hưởng đến kết quả phân tích phía sau. Do đó, ta sử dụng khoảng tứ phân vị (interquartile range) để loại bỏ các điểm outlier nhằm cải thiện tính chính xác của thống kê.
+
+```{r}
+rm.out <- function(x, na.rm = TRUE, ...){
+  qnt <- quantile(x, probs = c(.25,.75), na.rm = na.rm, ...)
+  H <- 1.5 * IQR(x, na.rm = na.rm)
+  y <- x
+  y[x < (qnt[1] - H)] <- NA
+  y[x > (qnt[2] + H)] <- NA
+  y
+}
+#Chuyen cac outliers thanh NA
+Nvidia = subset(All_GPUs_1,All_GPUs_1$Manufacturer =="Nvidia")
+Nvidia$Memory_Bandwidth = rm.out(Nvidia$Memory_Bandwidth)
+Nvidia$Memory_Bus = rm.out(Nvidia$Memory_Bus)
+Nvidia$Memory_Speed = rm.out(Nvidia$Memory_Speed)
+AMD = subset(All_GPUs_1,All_GPUs_1$Manufacturer =="AMD")
+AMD$Memory_Bandwidth = rm.out(AMD$Memory_Bandwidth)
+AMD$Memory_Bus = rm.out(AMD$Memory_Bus)
+AMD$Memory_Speed = rm.out(AMD$Memory_Speed)
+ATI = subset(All_GPUs_1,All_GPUs_1$Manufacturer =="ATI")
+ATI$Memory_Bandwidth = rm.out(ATI$Memory_Bandwidth)
+ATI$Memory_Bus = rm.out(ATI$Memory_Bus)
+ATI$Memory_Speed = rm.out(ATI$Memory_Speed)
+Intel = subset(All_GPUs_1,All_GPUs_1$Manufacturer =="Intel")
+Intel$Memory_Bandwidth = rm.out(Intel$Memory_Bandwidth)
+Intel$Memory_Bus = rm.out(Intel$Memory_Bus)
+Intel$Memory_Speed = rm.out(Intel$Memory_Speed)
+#ghep cac du lieu lai voi nhau
+All_GPUs_2 <- rbind(Nvidia,AMD,ATI,Intel)
+```
+
+Kiểm tra lại các giá trị khuyết trong All_GPUs_2 sau khi xử lý.
+
+```{r}
+apply(is.na(All_GPUs_2),2,sum)
+apply(is.na(All_GPUs_2),2,mean)
+```
+
+Nhận xét: Với dữ liệu trong trường hợp này, ta không chọn phương pháp xoá các N/A, vì lượng N/A trong Memory_Bus > 5%. Do đó, ta sẽ xử lý bằng phương pháp thay thế các N/A bằng các giá trị trung bình tương ứng với từng nhãn hàng.
+
+```{r}
+Nvidia$Memory_Bandwidth[is.na(Nvidia$Memory_Bandwidth)] = mean(Nvidia$Memory_Bandwidth, na.rm = T)
+AMD$Memory_Bandwidth[is.na(AMD$Memory_Bandwidth)] = mean(AMD$Memory_Bandwidth, na.rm = T)
+ATI$Memory_Bandwidth[is.na(ATI$Memory_Bandwidth)] = mean(ATI$Memory_Bandwidth, na.rm = T)
+Intel$Memory_Bandwidth[is.na(Intel$Memory_Bandwidth)] = mean(Intel$Memory_Bandwidth, na.rm = T)
+Nvidia$Memory_Bus[is.na(Nvidia$Memory_Bus)] = mean(Nvidia$Memory_Bus, na.rm = T)
+AMD$Memory_Bus[is.na(AMD$Memory_Bus)] = mean(AMD$Memory_Bus, na.rm = T)
+ATI$Memory_Bus[is.na(ATI$Memory_Bus)] = mean(ATI$Memory_Bus, na.rm = T)
+Intel$Memory_Bus[is.na(Intel$Memory_Bus)] = mean(Intel$Memory_Bus, na.rm = T)
+Nvidia$Memory_Speed[is.na(Nvidia$Memory_Speed)] = mean(Nvidia$Memory_Speed, na.rm = T)
+AMD$Memory_Speed[is.na(AMD$Memory_Speed)] = mean(AMD$Memory_Speed, na.rm = T)
+ATI$Memory_Speed[is.na(ATI$Memory_Speed)] = mean(ATI$Memory_Speed, na.rm = T)
+Intel$Memory_Speed[is.na(Intel$Memory_Speed)] = mean(Intel$Memory_Speed, na.rm = T)
+All_GPUs_2 <- rbind(Nvidia,AMD,ATI,Intel)
+#kiem tra lai so du lieu khuyet
+apply(is.na(All_GPUs_2), 2, which)
+```
+
+Nhận xét: Sau khi thay thế các N/A bằng các giá trị trung bình, dữ liệu đã không còn N/A. Ta tính lại các giá trị mô tả thống kê và vẽ lại biểu đồ boxplot cho ba biến theo Manufacturer.
+
+```{r}
+#Thong so thong ke bien Memory_Bandwidth 
+length = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,length)
+mean = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,mean)
+sd = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,sd)
+min = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,min)
+max = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,max)
+Q1 = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,quantile,probs = 0.25)
+Q2 = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,quantile,probs = 0.5)
+Q3 = tapply(All_GPUs_2$Memory_Bandwidth, All_GPUs_2$Manufacturer,quantile,probs = 0.75)
+t(data.frame(length,mean,sd,min,max,Q1,Q2,Q3))
+```
+Nhận xét: 
+
+1.Hãng AMD:
+
+  - Min = 1: Băng thông bộ nhớ nhỏ nhất là 1 (GB/sec)
+  
+  - Max = 390.4: Băng thông bộ nhớ lớn nhất là 390.4 (GB/sec)
+  
+  - Q1 = 28.8: 25% GPU có băng thông bộ nhớ cao nhất là 28.8 (GB/sec)
+  
+  - Q2 = 96: 50% GPU có băng thông bộ nhớ cao nhất là 96 (GB/sec)
+  
+  - Q3 = 179.2: 75% GPU có băng thông bộ nhớ cao nhất là 179.2 (GB/sec)
+  
+2. Hãng ATI
+
+  - Min = 211.2: Băng thông bộ nhớ nhỏ nhất là 211.2 (GB/sec)
+  
+  - Max = 256: Băng thông bộ nhớ lớn nhất là 256 (GB/sec)
+  
+  - Q1 = 224: 25% GPU có băng thông bộ nhớ cao nhất là 224 (GB/sec)
+  
+  - Q2 = 236: 50% GPU có băng thông bộ nhớ cao nhất là 236 (GB/sec)
+  
+  - Q3 = 256: 75% GPU có băng thông bộ nhớ cao nhất là 256 (GB/sec)
+  
+3. Hãng Intel
+  - Min = 1.1: Băng thông bộ nhớ nhỏ nhất là 1.1 (GB/sec)
+  
+  - Max = 34.1: Băng thông bộ nhớ lớn nhất là 34.1 (GB/sec)
+  
+  - Q1 = 12.8: 25% GPU có băng thông bộ nhớ cao nhất là 12.8 (GB/sec)
+  
+  - Q2 = 25.6: 50% GPU có băng thông bộ nhớ cao nhất là 25.6 (GB/sec)
+  
+  - Q3 = 29.9: 75% GPU có băng thông bộ nhớ cao nhất là 29.9 (GB/sec)
+  
+4. Hãng Nvidia
+
+  - Min = 1.1: Băng thông bộ nhớ nhỏ nhất là 1.1 (GB/sec)
+  
+  - Max = 494.2: Băng thông bộ nhớ lớn nhất là 494.2 (GB/sec)
+  
+  - Q1 = 40.1: 25% GPU có băng thông bộ nhớ cao nhất là 40.1 (GB/sec)
+  
+  - Q2 = 112.2: 50% GPU có băng thông bộ nhớ cao nhất là 112.2 (GB/sec)
+  
+  - Q3 = 198.7: 75% GPU có băng thông bộ nhớ cao nhất là 198.7 (GB/sec)
+  
+```{r}
+#Thong so thong ke bien Memory_Bus 
+length = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,length)
+mean = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,mean)
+sd = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,sd)
+min = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,min)
+max = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,max)
+Q1 = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,quantile,probs = 0.25)
+Q2 = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,quantile,probs = 0.5)
+Q3 = tapply(All_GPUs_2$Memory_Bus, All_GPUs_2$Manufacturer,quantile,probs = 0.75)
+t(data.frame(length,mean,sd,min,max,Q1,Q2,Q3))
+```
+Nhận xét: 
+
+1. Hãng AMD:
+
+  - Min = 32: Bus bộ nhớ nhỏ nhất là 32 (Bit)
+  
+  - Max = 384: Bus bộ nhớ lớn nhất là 384 (Bit)
+  
+  - Q1 = 128: 25% GPU có bus bộ nhớ cao nhất là 128 (Bit)
+  
+  - Q2 = 128: 50% GPU có bus bộ nhớ cao nhất là 128 (Bit)
+  
+  - Q3 = 256: 75% GPU có bus bộ nhớ cao nhất là 256 (Bit)
+  
+2. Hãng ATI
+
+  - Min = 256: Bus bộ nhớ nhỏ nhất là 256 (Bit)
+  
+  - Max = 256: Bus bộ nhớ lớn nhất là 256 (Bit)
+  
+  - Q1 = 256: 25% GPU có bus bộ nhớ cao nhất là 256 (Bit)
+  
+  - Q2 = 256: 50% GPU có bus bộ nhớ cao nhất là 256 (Bit)
+  
+  - Q3 = 256: 75% GPU có bus bộ nhớ cao nhất là 256 (Bit)
+  
+3. Hãng Intel
+
+  - Min = 128: Bus bộ nhớ nhỏ nhất là 128 (Bit)
+  
+  - Max = 128: Bus bộ nhớ lớn nhất là 128 (Bit)
+  
+  - Q1 = 128: 25% GPU có bus bộ nhớ cao nhất là 128 (Bit)
+  
+  - Q2 = 128: 50% GPU có bus bộ nhớ cao nhất là 128 (Bit)
+  
+  - Q3 = 128: 75% GPU có bus bộ nhớ cao nhất là 128 (Bit)
+  
+4. Hãng Nvidia
+
+  - Min = 32: Bus bộ nhớ nhỏ nhất là 32 (Bit)
+  
+  - Max = 448: Bus bộ nhớ lớn nhất là 448 (Bit)
+  
+  - Q1 = 128: 25% GPU có bus bộ nhớ cao nhất là 128 (Bit)
+  
+  - Q2 = 192: 50% GPU có bus bộ nhớ cao nhất là 192 (Bit)
+  
+  - Q3 = 256: 75% GPU có bus bộ nhớ cao nhất là 256 (Bit)
+  
+
+```{r}
+#Thong so thong ke bien Memory_Speed 
+length = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,length)
+mean = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,mean)
+sd = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,sd)
+min = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,min)
+max = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,max)
+Q1 = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,quantile,probs = 0.25)
+Q2 = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,quantile,probs = 0.5)
+Q3 = tapply(All_GPUs_2$Memory_Speed, All_GPUs_2$Manufacturer,quantile,probs = 0.75)
+t(data.frame(length,mean,sd,min,max,Q1,Q2,Q3))
+```
+
+Nhận xét: 
+
+1. Hãng AMD:
+
+  - Min = 130: Tốc độ bộ nhớ nhỏ nhất là 130 (Mhz)
+  
+  - Max = 2000: Tốc độ bộ nhớ lớn nhất là 2000 (Mhz)
+  
+  - Q1 = 840: 25% GPU có tốc độ bộ nhớ cao nhất là 840 (Mhz)
+  
+  - Q2 = 1125: 50% GPU có tốc độ bộ nhớ cao nhất là 1125 (Mhz)
+  
+  - Q3 = 1400: 75% GPU có tốc độ bộ nhớ cao nhất là 1400 (Mhz)
+  
+2. Hãng ATI
+
+  - Min = 1650: Tốc độ bộ nhớ nhỏ nhất là 1650 (Mhz)
+  
+  - Max = 2000: Tốc độ bộ nhớ lớn nhất là 2000 (Mhz)
+  
+  - Q1 = 1750: 25% GPU có tốc độ bộ nhớ cao nhất là 1750 (Mhz)
+  
+  - Q2 = 1750: 50% GPU có tốc độ bộ nhớ cao nhất là 1750 (Mhz)
+  
+  - Q3 = 2000: 75% GPU có tốc độ bộ nhớ cao nhất là 2000 (Mhz)
+  
+3. Hãng Intel
+
+  - Min = 333: Tốc độ bộ nhớ nhỏ nhất là 333 (Mhz)
+  
+  - Max = 1067: Tốc độ bộ nhớ lớn nhất là 1067 (Mhz)
+  
+  - Q1 = 667: 25% GPU có tốc độ bộ nhớ cao nhất là 667 (Mhz)
+  
+  - Q2 = 800: 50% GPU có tốc độ bộ nhớ cao nhất là 800 (Mhz)
+  
+  - Q3 = 933: 75% GPU có tốc độ bộ nhớ cao nhất là 933 (Mhz)
+  
+4. Hãng Nvidia
+
+  - Min = 110: Tốc độ bộ nhớ nhỏ nhất là 110 (Mhz)
+  
+  - Max = 2127: Tốc độ bộ nhớ lớn nhất là 2127 (Mhz)
+  
+  - Q1 = 900: 25% GPU có tốc độ bộ nhớ cao nhất là 900 (Mhz)
+  
+  - Q2 = 1252: 50% GPU có tốc độ bộ nhớ cao nhất là 1252 (Mhz)
+  
+  - Q3 = 1750: 75% GPU có tốc độ bộ nhớ cao nhất là 1750 (Mhz)
+  
+Vẽ boxplot để so sánh giữa các nhãn hàng.
+
+```{r}
+boxplot(Memory_Bandwidth~Manufacturer, xlab = "Manufacturer", ylab = "Memory Bandwidth (GB/sec)", main = "Boxplot of Memory Bandwidth for each Manufacturer", data = All_GPUs_2, col = 2:7)
+boxplot(Memory_Bus~Manufacturer, xlab = "Manufacturer", ylab = "Memory Bus (Bit)", main = "Boxplot of Memory Bus for each Manufacturer", data = All_GPUs_2, col = 2:7)
+boxplot(Memory_Speed~Manufacturer, xlab = "Manufacturer", ylab = "Memory Speed (Mhz)", main = "Boxplot of Memory Speed for each Manufacturer", data = All_GPUs_2, col = 2:7)
+```
+
+Nhận xét: 
+
+Đối với Memory_Bandwidth: 
+
+  - GPU có Memory Bandwidth cao nhất là của hãng Nvidia. 
+  
+  - Memory Bandwidth của hãng AMD và Nvidia có phạm vi dữ liệu rộng. Còn với ATI và Intel thì phạm vi dữ liệu hẹp 
+  
+  - IQR của hãng Nvidia và AMD đều nhỏ khi so với độ dài râu chứng tỏ dữ liệu tập trung cao. Còn với ATI và Intel thì IQR lớn khi so với độ dài râu chứng tỏ dữ liệu có tính tập trung không cao.
+  
+  - Phân phối Memory Bandwidth ở cả 4 hãng đều không đối xứng: phân phối dữ liệu ở hãng AMD và Nvidia lệch phải, trong khi đó ở hãng ATI và Intel lệch trái
+  
+Đối với Memory_Bus: 
+
+  - GPU có Memory Bus cao nhất là của hãng Nvidia. 
+  
+  - Memory Bus của hãng AMD và Nvidia có phạm vi dữ liệu rộng. Còn với ATI và Intel thì phạm vi dữ liệu hẹp. 
+  
+  - IQR của hãng Nvidia và AMD đều nhỏ khi so với độ dài râu chứng tỏ dữ liệu tập trung cao. Còn với ATI và Intel thì không.
+  
+  - Phân phối dữ liệu ở hãng AMD và Nvidia lệch phải, trong khi đó ở hãng ATI và Intel thì không.
+  
+Đối với Memory_Speed: 
+
+  - GPU có Memory Speed cao nhất là của hãng Nvidia. 
+  
+  - Memory Speed của hãng AMD và Nvidia có phạm vi dữ liệu rộng. Còn với ATI và Intel thì phạm vi dữ liệu hẹp. 
+  
+  - IQR của hãng Nvidia, AMD và Intel đều nhỏ khi so với độ dài râu chứng tỏ dữ liệu tập trung cao. Còn với ATI thì IQR lớn khi so với độ dài râu chứng tỏ dữ liệu có tính tập trung không cao.
+  
+  - Phân phối Memory Speed ở cả 4 hãng đều không đối xứng: phân phối dữ liệu ở hãng AMD và Nvidia lệch trái, trong khi đó ở hãng ATI và Intel lệch phải 
+
+### Biểu đồ Histogram
+
+Ta dùng đồ thị Histogram để phân tích chung về băng thông bộ nhớ, bus bộ nhớ và tốc độ bộ nhớ của tất cả các GPU trên thị trường.
+
+```{r}
+hist(All_GPUs_2$Memory_Bandwidth,xlab="Memory_Bandwidth",main="Histogram of Memory Bandwidth", labels=T)
+hist(All_GPUs_2$Memory_Bus,xlab="Memory_Bus",main="Histogram of Memory Bus", labels=T)
+hist(All_GPUs_2$Memory_Speed,xlab="Memory_Speed",main="Histogram of Memory Speed", labels=T)
+library(ggplot2)
+```
+
+Nhận xét :
+
+  - Đối với Memory_Bandwidth: Ta có thể thấy đồ thị bị lệch sang trái và phân tán rộng. Biểu đồ này cho thấy một sự phân bố đa dạng về tốc độ băng thông bộ nhớ. Tập trung nhiều nhất trong khoảng từ 0 đến 50 Gb/sec với tần suất 1085, và ít nhất trong khoảng từ 400 đến 450 Gb/sec với tần suất 26. Ta rút ra được tốc độ băng thông bộ nhớ nhiều nhất dưới 200 Gb/sec, đặc biệt là từ 0 đến 50 Gb/sec. Bên cạnh đó, băng thông bộ nhớ hơn 200 Gb/sec không nhiều, đặc biệt là trên 350 Gb/sec.
+
+  - Đối với Memory_Bus: Ta có thể thấy đồ thị phân bố không đều và phân tán rộng. Biểu đồ này cho thấy một sự phân bố đa dạng về số lượng bit mà bus có thể truyền. Tập trung nhiều nhất trong khoảng từ 100 đến 150 Bit với tần suất 1379, và ít nhất trong khoảng từ 200 đến 250 Gb/sec với tần suất là 0. Ta rút ra được số lượng bit mà bus có thể truyền nhiều nhất tập trung từ 100 đến 150 Bit, 250 đến 300 Bit. Bên cạnh đó, ở các khoảng từ 50 đến 100 Bit, 150 đến 200 Bit, 350 đến 400 Bit không có sự khác biệt lớn về tần số xuất hiện giữa các khoảng này. Các khoảng còn lại tần số xuất hiện rất thấp, thậm chí là không có. Số lượng bit mà bus có thể truyền từ 400 đến 450 Bit được xem là ngoại lai, do nó vượt ra khỏi giới hạn dữ liệu là từ 0 đến 400 Bit.
+
+  - Đối với Memory_Speed: Ta có thể thấy đồ thị phân tán rộng. Biểu đồ này cho thấy một sự phân bố đa dạng về tốc độ bộ nhớ. Tốc độ bộ nhớ từ 1600 đến 1800 MHz chiếm cao nhất, ít nhất là từ 0 đến 200 MHz. Ta thấy tốc độ bộ nhớ đa phần ở khoảng 600 đến 1800 MHz. Trong khi đó, các khoảng còn lại trong giới hạn ( dưới 600 MHz và từ 1800 đến 2000 MHz) ít hơn rất nhiều. Ngoài ra, ta thấy tốc độ bộ nhớ trên 2000 MHz được xem là ngoại lai, do nó vượt ra khỏi giới hạn dữ liệu là từ 0 đến 1800 MHz.
+
+## ANOVA
+
+Ta sử dụng mô hình ANOVA một nhân tố để đánh giá sự khác biệt về băng thông bộ nhớ trong GPU giữa các nhãn hàng.
+
+Đặt giả thuyết:
+
+  - Giả thuyết H0: Băng thông bộ nhớ trung bình giữa các nhãn hàng bằng nhau.
+  
+  - Đối thuyết H1: Có ít nhất 2 nhãn hàng có băng thông bộ nhớ trung bình khác nhau.
+  
+Các giả định cần kiểm tra trong ANOVA một nhân tố:
+
+  - Giả định phân phối chuẩn: Băng thông bộ nhớ của các nhãn hàng tuân theo phân phối chuẩn.
+  
+  - Tính đồng nhất của các phương sai: Phương sai giữa băng thông bộ nhớ ở các nhãn hàng không bằng nhau.
+  
+### Kiểm tra giả định phân phối chuẩn
+
+  - Giả thuyết H0: Băng thông bộ nhớ của các nhãn hàng tuân theo phân phối chuẩn.
+  
+  - Giả thuyết đối H1: Băng thông bộ nhớ của các nhãn hàng không tuân theo phân phối chuẩn.
+
+```{r}
+Nvidia= subset(All_GPUs_2 , All_GPUs_2$Manufacturer == "Nvidia")
+qqnorm(Nvidia$Memory_Bandwidth)
+qqline(Nvidia$Memory_Bandwidth)
+ad.test(Nvidia$Memory_Bandwidth)
+```
+
+Nhận xét: Theo biểu đồ QQ-plot, ta nhận thấy có nhiều giá trị quan sát không nằm trên đường thẳng kì vọng của phân phối chuẩn do đó, biến Memory_Bandwidth ở hãng Nvidia không tuân theo phân phối chuẩn. Ngoài ra, p_value ở các kiểm định ad.test bé hơn rất nhiều so với mức ý nghĩa α = 0.05, nên ta bác bỏ giả thuyết H0, đồng thời đưa ra kết luận là biến Memory_Bandwidth ở hãng Nvidia không tuân theo phân phối chuẩn.
+
+```{r}
+AMD= subset(All_GPUs_2 , All_GPUs_2$Manufacturer == "AMD")
+qqnorm(AMD$Memory_Bandwidth)
+qqline(AMD$Memory_Bandwidth)
+ad.test(AMD$Memory_Bandwidth)
+```
+
+Nhận xét: Theo biểu đồ QQ-plot, ta nhận thấy có nhiều giá trị quan sát không nằm trên đường thẳng kì vọng của phân phối chuẩn do đó, biến Memory_Bandwidth ở hãng AMD không tuân theo phân phối chuẩn. Ngoài ra, p_value ở các kiểm định ad.test bé hơn rất nhiều so với mức ý nghĩa α = 0.05, nên ta bác bỏ giả thuyết H0, đồng thời đưa ra kết luận là biến Memory_Bandwidth ở hãng AMD không tuân theo phân phối chuẩn.
+
+```{r}
+ATI= subset(All_GPUs_2 , All_GPUs_2$Manufacturer == "ATI")
+qqnorm(ATI$Memory_Bandwidth)
+qqline(ATI$Memory_Bandwidth)
+ad.test(ATI$Memory_Bandwidth)
+```
+
+Nhận xét: Theo biểu đồ QQ-plot, ta nhận thấy có nhiều giá trị quan sát không nằm trên đường thẳng kì vọng của phân phối chuẩn do đó, biến Memory_Bandwidth ở hãng ATI không tuân theo phân phối chuẩn. Ngoài ra, p_value ở các kiểm định ad.test bé hơn rất nhiều so với mức ý nghĩa α = 0.05, nên ta bác bỏ giả thuyết H0, đồng thời đưa ra kết luận là biến Memory_Bandwidth ở hãng ATI không tuân theo phân phối chuẩn.
+
+```{r}
+Intel= subset(All_GPUs_2 , All_GPUs_2$Manufacturer == "Intel")
+qqnorm(Intel$Memory_Bandwidth)
+qqline(Intel$Memory_Bandwidth)
+ad.test(Intel$Memory_Bandwidth)
+```
+
+Nhận xét: Theo biểu đồ QQ-plot, ta nhận thấy có nhiều giá trị quan sát không nằm trên đường thẳng kì vọng của phân phối chuẩn do đó, biến Memory_Bandwidth ở hãng Intel không tuân theo phân phối chuẩn. Ngoài ra, p_value ở các kiểm định ad.test bé hơn rất nhiều so với mức ý nghĩa α = 0.05, nên ta bác bỏ giả thuyết H0, đồng thời đưa ra kết luận là biến Memory_Bandwidth ở hãng Intel không tuân theo phân phối chuẩn.
+
+### Kiểm định giả định về tính đồng nhất của các phương sai:
+
+  - Giả thuyết H0: Phương sai giữa băng thông bộ nhớ ở các nhãn hàng bằng nhau.
+  
+  - Giả thuyết đối H1: Có ít nhất 2 nhãn hàng có phương sai băng thông bộ nhớ khác nhau.
+
+```{r}
+library(car)
+leveneTest(Memory_Bandwidth~as.factor(Manufacturer), data =All_GPUs_2)
+```
+
+Nhận xét: Dựa trên p_value ở các kiểm định leveneTest bé hơn rất nhiều so với mức ý nghĩa α = 0.05, nên ta bác bỏ giả thuyết H0, đồng thời đưa ra kết luận là có ít nhất 2 nhãn hàng có phương sai băng thông bộ nhớ khác nhau.
+
+### Thực hiện
+
+Qua hai phần kiểm định trên, ta thấy dữ liệu của ta không thỏa mãn các giả thiết của phương pháp ANOVA, kết quả của phân tích ANOVA có thể không chính xác và không đáng tin cậy. Thay vào đó ta sẽ sử dụng phương pháp phi tham số Kruskal - Wallis.
+
+```{r}
+kruskal.test(Memory_Bandwidth~Manufacturer,All_GPUs_2)
+```
+Nhận xét: Dựa trên p_value bé hơn rất nhiều so với mức ý nghĩa α = 0.05, nên ta bác bỏ giả thuyết H0, đồng thời đưa ra kết luận là có ít nhất 2 nhãn hàng có băng thông bộ nhớ khác nhau.
+
+### So sánh bội:
+
+Ta đã biết rằng ít nhất có 2 nhãn hàng có băng thông bộ nhớ trung bình khác nhau, tuy nhiên ta cần thêm một so sánh giữa các cặp nhãn hàng để có thêm thông tin.
+
+```{r}
+library(pgirmess)
+kruskalmc(All_GPUs_2$Memory_Bandwidth,All_GPUs_2$Manufacturer)
+```
+Nhận xét: Tất cả các nhãn hàng đều có băng thông bộ nhớ khác nhau.
+
+## Mô hình hồi quy tuyến tính 
+
+Để phân tích các yếu tố ảnh hưởng đến băng thông bộ nhớ.
+
+### Xây dựng mô hình hồi quy:
+
+  - biến phụ thuộc:  Memory_Bandwidth
+  
+  - biến độc lập: Memory_Type, Memory_Speed, Memory_Bus, Manufacturer
+
+```{r}
+#mô hình 1:
+All_GPUs_lm1 <- lm(Memory_Bandwidth~Manufacturer+Memory_Bus+Memory_Speed+Memory_Type,All_GPUs_2)
+summary(All_GPUs_lm1)
+```
+
+Kiểm định các hệ số hồi quy:
+
+  - Giả thuyết H0: Hệ số hồi quy không có ý nghĩa thống kê.
+  
+  - Giả thuyết đối H1: Hệ số hồi quy có ý nghĩa thống kê.
+  
+Nhận xét: p_value của các hệ số ứng với biến ManufacturerATI, ManufacturerIntel, Memory_TypeDDR2, Memory_TypeeDRAM, Memory_TypeGDDR2, Memory_TypeGDDR5 lớn hơn mức ý nghĩa α = 0.05 nên ta chấp nhận giả thuyết H0. Do đó hệ số đối với biến này không có ý nghĩa với mô hình hồi quy ta xây dựng. Ta có thể cân nhắc loại bỏ biến Manufacturer và Memory_Type ra khỏi mô hình.
+
+```{r}
+#mô hình 2:
+All_GPUs_lm2 <- lm(Memory_Bandwidth~Memory_Bus+Memory_Speed,All_GPUs_2)
+summary(All_GPUs_lm2)
+```
+So sánh hai mô hình:
+
+  - Giả thuyết H0: Hai mô hình hoạt động hiệu quả giống nhau (nghĩa là mô hình 2 hiệu quả hơn mô hình 1 vì ít biến hơn).
+
+  - Đối thuyết H1: Hai mô hình hiệu quả khác nhau (nghĩa là mô hình 1 hiệu quả hơn mô hình 2).
+
+```{r}
+anova(All_GPUs_lm1,All_GPUs_lm2)
+```
+
+Nhận xét: Dựa trên việc so sánh 2 mô hình, ta nhận thấy p_value rất bé so với mức ý nghĩa α = 0.05 nên ta bác bỏ giả thuyết H0, ta có thể kết luận 2 mô hình hiệu quả khác nhau, có nghĩa là mô hình 1 hiệu quả hơn mô hình 2 (vì ít nhất có 1 hệ số βi có ý nghĩa thống kê nên mô hình đầy đủ là mô hình 1 hiệu quả hơn). Ngoài ra, ta có thể dựa vào hệ số hiệu chỉnh ở mô hình 1 (Adjusted R_squared = 0.7525) cao hơn so với mô hình 2 (Adjusted R-squared = 0.6081), chứng tỏ sự biến thiên của biến Memory_Bandwidth được giải thích nhiều hơn bởi các biến độc lập. Như vậy mô hình 1 hiệu quả hơn mô hình 2.
+
+### Phân tích sự tác động của các nhân tố 
+
+Ta thấy rằng p_value < 2.2e−16, có ý nghĩa rất cao. Điều này chỉ ra rằng, ít nhất một biến mô hình có ý nghĩa giải thích rất cao đến sự biến đổi băng thông bộ nhớ của các nhãn hàng. p_value tương ứng với các biến Memory_Speed, Memory_Bus, Memory_TypeGDDR5X < 2e−16, điều này nói lên rằng ảnh hưởng của các biến này có ý nghĩa rất lơn đến sự biến đổi băng thông bộ nhớ của các hãng.
+
+Mặt khác, hệ số hồi quy βi của một biến dự báo cũng có thể được xem như ảnh hưởng trung bình lên biến phụ thuộc Memory_Bandwidth khi tăng một đơn vị của biến đự báo đó, giả sử rằng các biến dự báo khác không đổi. Cụ thể, ˆβ5 = 0.108789 có nghĩa rằng khi tốc độ bộ nhớ tăng 1 đơn vị thì ta có thể kỳ vọng chênh lệch băng thông bộ nhớ tăng lên 0.108789 GB/sec. Với ˆβ4 = 0.488314 thì khi Bus bộ nhớ tăng 1 đơn vị, ta có thể kỳ vọng chênh lệch băng thông bộ nhớ tăng lên 0.488314 GB/sec. 
+
+Hệ số R^2 bằng 0.7537 nghĩa là 75.37% sự biến thiên trong băng thông bộ nhớ được giải thích bởi các biến độc lập
+
+### Kiểm tra các giả định của mô hình:
+  - Tính tuyến tính của dữ liệu: mối quan hệ giữa biến dự báo X và biến phụ thuộc Y được giả sử là tuyến tính.
+  
+  - Sai số có kỳ vọng bằng 0.
+  
+  - Phương sai của các sai số là hằng số.
+  
+  - Các sai số độc lập nhau.
+
+```{r}
+par(mfrow=c(2,2))
+plot(All_GPUs_lm1) #analyst plot
+```
+
+Nhận xét:
+
+  - Đồ thị thứ nhất vẽ các sai số tương ứng với các giá trị dự báo, kiểm tra giả định tuyến tính của dữ liệu, giả định sai số có kỳ vọng bằng 0, giả định phương sai của sai số là hằng số. Dựa trên đồ thị ta thấy, đường màu đỏ có sự biến thiên nên giả định tuyến tính của dữ liệu không thỏa mãn. Đường màu đỏ không nằm sát đường y = 0 nên giả định sai số có kỳ vọng bằng 0 không thỏa mãn. Các sai số phân tán ngẫu nhiên không dọc theo đường màu đỏ nên giả định phương sai các biến là hằng số không thỏa mãn.
+
+  - Đồ thị thứ hai vẽ các sai số đã được chuẩn hoá, kiểm tra giả định sai số có phân phối chuẩn. Dựa trên đồ thị ta thấy, có nhiều điểm quan trắc lệch ra khỏi dường thẳng kì vọng phân phối chuẩn nên giả định sai số có phân phối chuẩn chưa thoả mãn.
+
+  - Đồ thị thứ ba vẽ căn bậc hai của các sai số đã được chuẩn hoá, kiểm tra giả định phương sai các sai số là hằng số. Dựa vào đồ thị ta thấy, đường màu đỏ là một đường cong không ổn định và các quan trắc phân tán không đều quanh đường thẳng. Đa số các điểm phân bố ở khu vực gần điểm 0 và hỗn loạn nên giả định phương sai các hằng số thỏa mãn là không thỏa mãn
+
+  - Đồ thị thứ tư chỉ ra các quan trắc có thể là các điểm có ảnh hưởng cao trong bộ dữ liệu. Trong đó các quan trắc 60, 62 và 1180 có thể là những điểm có ảnh hưởng cao. Tuy nhiên các điểm này không vượt khỏi đường cook nên chúng không thực sự có ảnh hưởng cao nên không cần loại bỏ chúng khi phân tích.
+
